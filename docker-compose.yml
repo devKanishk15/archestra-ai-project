@@ -1,0 +1,160 @@
+version: '3.8'
+
+services:
+  # Archestra.ai Platform
+  archestra:
+    image: archestra/platform:latest
+    container_name: archestra-platform
+    ports:
+      - "9000:9000" # API
+      - "3000:3000" # UI
+    environment:
+      - ARCHESTRA_QUICKSTART=true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - archestra-postgres-data:/var/lib/postgresql/data
+      - archestra-app-data:/app/data
+    networks:
+      - archestra-network
+    restart: unless-stopped
+
+  # Elasticsearch
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.3
+    container_name: elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+      - ./data/init-elasticsearch.sh:/usr/local/bin/init-elasticsearch.sh
+      - ./data/sample-data.json:/usr/share/elasticsearch/sample-data.json
+    networks:
+      - archestra-network
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Kibana (Elasticsearch UI)
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.11.3
+    container_name: kibana
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+    networks:
+      - archestra-network
+    depends_on:
+      - elasticsearch
+    restart: unless-stopped
+
+  # PostgreSQL
+  postgres:
+    image: postgres:16-alpine
+    container_name: postgres-db
+    environment:
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=admin123
+      - POSTGRES_DB=transformation_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./data/init-postgres.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - archestra-network
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U admin -d transformation_db" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # pgAdmin (PostgreSQL UI)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: pgadmin
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=admin@admin.com
+      - PGADMIN_DEFAULT_PASSWORD=admin123
+      - PGADMIN_CONFIG_SERVER_MODE=False
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+    networks:
+      - archestra-network
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
+  # Elasticsearch Data Initializer
+  es-init:
+    image: curlimages/curl:latest
+    container_name: es-init
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - archestra-network
+    volumes:
+      - ./data/sample-data.json:/data/sample-data.json
+      - ./data/init-elasticsearch.sh:/init-elasticsearch.sh
+    entrypoint: [ "/bin/sh", "/init-elasticsearch.sh" ]
+    restart: "no"
+
+  # Elasticsearch MCP Server
+  elasticsearch-mcp:
+    build:
+      context: ./mcp-servers/elasticsearch-mcp
+      dockerfile: Dockerfile
+    container_name: elasticsearch-mcp
+    environment:
+      - ELASTICSEARCH_URL=http://elasticsearch:9200
+    networks:
+      - archestra-network
+    depends_on:
+      - elasticsearch
+    restart: unless-stopped
+    stdin_open: true
+    tty: true
+
+  # PostgreSQL MCP Server
+  postgres-mcp:
+    build:
+      context: ./mcp-servers/postgres-mcp
+      dockerfile: Dockerfile
+    container_name: postgres-mcp
+    environment:
+      - POSTGRES_HOST=postgres-db
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=transformation_db
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=admin123
+    networks:
+      - archestra-network
+    depends_on:
+      - postgres
+    restart: unless-stopped
+    stdin_open: true
+    tty: true
+
+volumes:
+  archestra-postgres-data:
+  archestra-app-data:
+  elasticsearch-data:
+  postgres-data:
+  pgadmin-data:
+
+
+networks:
+  archestra-network:
+    driver: bridge
