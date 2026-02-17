@@ -10,6 +10,8 @@ services:
       - "3000:3000" # UI
     environment:
       - ARCHESTRA_QUICKSTART=true
+      - ARCHESTRA_VLLM_BASE_URL=${ARCHESTRA_VLLM_BASE_URL}
+      - ARCHESTRA_CHAT_VLLM_API_KEY=${ARCHESTRA_CHAT_VLLM_API_KEY}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - archestra-postgres-data:/var/lib/postgresql/data
@@ -65,7 +67,7 @@ services:
       - POSTGRES_PASSWORD=admin123
       - POSTGRES_DB=transformation_db
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./data/init-postgres.sql:/docker-entrypoint-initdb.d/init.sql
@@ -123,26 +125,6 @@ services:
       - archestra-network
     depends_on:
       - elasticsearch
-    restart: unless-stopped
-    stdin_open: true
-    tty: true
-
-  # PostgreSQL MCP Server
-  postgres-mcp:
-    build:
-      context: ./mcp-servers/postgres-mcp
-      dockerfile: Dockerfile
-    container_name: postgres-mcp
-    environment:
-      - POSTGRES_HOST=postgres-db
-      - POSTGRES_PORT=5432
-      - POSTGRES_DB=transformation_db
-      - POSTGRES_USER=admin
-      - POSTGRES_PASSWORD=admin123
-    networks:
-      - archestra-network
-    depends_on:
-      - postgres
     restart: unless-stopped
     stdin_open: true
     tty: true

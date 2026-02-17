@@ -57,7 +57,19 @@ This hackathon project demonstrates the power of Archestra.ai by creating an aut
 
 ## 🚀 Quick Start
 
-### 1. Start the Platform
+### 1. Configure Environment
+
+```bash
+# Copy the example environment file
+cp .env.example .env
+
+# Edit .env with your actual credentials
+# Update these values:
+# - ARCHESTRA_VLLM_BASE_URL (your LLM endpoint)
+# - ARCHESTRA_CHAT_VLLM_API_KEY (your API key)
+```
+
+### 2. Start the Platform
 
 ```powershell
 # Navigate to project directory
@@ -71,7 +83,7 @@ docker-compose up -d
 docker-compose ps
 ```
 
-### 2. Verify Setup
+### 3. Verify Setup
 
 **Windows:**
 ```powershell
@@ -84,7 +96,7 @@ chmod +x scripts/verify-setup.sh
 ./scripts/verify-setup.sh
 ```
 
-### 3. Configure Archestra
+### 4. Configure Archestra
 
 1. **Access Archestra UI**: http://localhost:3000
 
@@ -114,7 +126,7 @@ chmod +x scripts/verify-setup.sh
    - Select your LLM model
    - Save agent
 
-### 4. Run Transformation
+### 5. Run Transformation
 
 1. Go to **Chat** interface
 2. Select **Data Transformer Agent**

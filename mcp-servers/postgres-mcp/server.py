@@ -154,6 +154,27 @@ async def list_tools() -> list[Tool]:
                 },
                 "required": ["table"]
             }
+        ),
+        Tool(
+            name="execute_write_query",
+            description="Execute INSERT, UPDATE, or DELETE queries. For safety, DDL commands (DROP, TRUNCATE, ALTER) are not allowed.",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "SQL query to execute (INSERT, UPDATE, or DELETE)"
+                    },
+                    "params": {
+                        "type": "array",
+                        "description": "Optional parameters for prepared statement",
+                        "items": {
+                            "type": ["string", "number", "boolean", "null"]
+                        }
+                    }
+                },
+                "required": ["query"]
+            }
         )
     ]
 
@@ -358,6 +379,46 @@ async def call_tool(name: str, arguments: Any) -> Sequence[TextContent | ImageCo
                 text=json.dumps({
                     "table": table,
                     "count": result["count"]
+                }, indent=2)
+            )]
+        
+        elif name == "execute_write_query":
+            query = arguments["query"].strip()
+            params = arguments.get("params", [])
+            
+            # Safety check: only allow INSERT, UPDATE, DELETE
+            query_upper = query.upper()
+            allowed_keywords = ["INSERT", "UPDATE", "DELETE"]
+            disallowed_keywords = ["DROP", "TRUNCATE", "ALTER", "CREATE"]
+            
+            # Check if query starts with allowed keyword
+            starts_with_allowed = any(query_upper.startswith(kw) for kw in allowed_keywords)
+            contains_disallowed = any(kw in query_upper for kw in disallowed_keywords)
+            
+            if not starts_with_allowed or contains_disallowed:
+                return [TextContent(
+                    type="text",
+                    text="Error: Only INSERT, UPDATE, and DELETE queries are allowed. DDL commands (DROP, TRUNCATE, ALTER, CREATE) are not permitted."
+                )]
+            
+            # Execute the query
+            if params:
+                cursor.execute(query, params)
+            else:
+                cursor.execute(query)
+            
+            affected_rows = cursor.rowcount
+            conn.commit()
+            
+            cursor.close()
+            conn.close()
+            
+            return [TextContent(
+                type="text",
+                text=json.dumps({
+                    "status": "success",
+                    "affected_rows": affected_rows,
+                    "query_type": query_upper.split()[0]
                 }, indent=2)
             )]
         

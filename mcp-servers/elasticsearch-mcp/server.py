@@ -17,6 +17,7 @@ from mcp.server.stdio import stdio_server
 
 # Initialize Elasticsearch client
 ES_URL = os.getenv("ELASTICSEARCH_URL", "http://elasticsearch:9200")
+# ES 8.x Python client handles compatibility mode automatically by default
 es_client = Elasticsearch([ES_URL])
 
 # Initialize MCP server
